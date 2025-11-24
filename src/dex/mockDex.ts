@@ -2,7 +2,14 @@
 // Simulates realistic delays (2-3s) and price variation (2-5%)
 export type DexQuote = { dex: string; price: number; liquidity: number };
 
+const TEST_MODE = process.env.NODE_ENV === 'test';
+
 export async function getRaydiumQuote(amount: number): Promise<DexQuote> {
+  if (TEST_MODE) {
+    // deterministic fast response for tests
+    return { dex: 'raydium', price: 101, liquidity: 120000 };
+  }
+
   // simulate network delay
   await new Promise((r) => setTimeout(r, 2000 + Math.random() * 1000));
   // base price 100, apply variation
@@ -13,6 +20,10 @@ export async function getRaydiumQuote(amount: number): Promise<DexQuote> {
 }
 
 export async function getMeteoraQuote(amount: number) {
+  if (TEST_MODE) {
+    return { dex: 'meteora', price: 99, liquidity: 90000 };
+  }
+
   await new Promise((r) => setTimeout(r, 2000 + Math.random() * 1000));
   const base = 100;
   const variation = (Math.random() * 0.03) + 0.02; // 2% - 5%

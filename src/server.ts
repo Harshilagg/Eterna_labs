@@ -160,6 +160,9 @@ export async function buildServer(desiredPort?: number) {
   };
   process.on('SIGINT', shutdown);
   process.on('SIGTERM', shutdown);
+
+  // return fastify instance for testing/embedding
+  return fastify;
 }
 
 // Removed misplaced buildServer call and redundant WebSocket route definition
@@ -187,7 +190,7 @@ orderQueueEvents.on('progress', ({ jobId, data }) => {
   for (const s of wsClients) s.send(msg);
 });
 
-// start the server only when executed directly
+// start the server only when this file is run directly
 if (require.main === module) {
   buildServer().catch((err) => {
     console.error('Failed to start server', err);
