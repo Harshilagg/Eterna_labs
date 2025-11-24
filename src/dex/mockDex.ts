@@ -1,0 +1,28 @@
+// Mock DEX quotes for Raydium and Meteora
+// Simulates realistic delays (2-3s) and price variation (2-5%)
+export type DexQuote = { dex: string; price: number; liquidity: number };
+
+export async function getRaydiumQuote(amount: number): Promise<DexQuote> {
+  // simulate network delay
+  await new Promise((r) => setTimeout(r, 2000 + Math.random() * 1000));
+  // base price 100, apply variation
+  const base = 100;
+  const variation = (Math.random() * 0.03) + 0.02; // 2% - 5%
+  const price = Number((base * (1 + variation)).toFixed(6));
+  return { dex: 'raydium', price, liquidity: 100000 + Math.random() * 50000 };
+}
+
+export async function getMeteoraQuote(amount: number) {
+  await new Promise((r) => setTimeout(r, 2000 + Math.random() * 1000));
+  const base = 100;
+  const variation = (Math.random() * 0.03) + 0.02; // 2% - 5%
+  // slightly different random seed
+  const price = Number((base * (1 + variation * (Math.random() > 0.5 ? 1 : -1))).toFixed(6));
+  return { dex: 'meteora', price, liquidity: 80000 + Math.random() * 70000 };
+}
+
+export function chooseBestQuote(q1: DexQuote, q2: DexQuote): DexQuote {
+  // For a market buy, lower price is better
+  if (q1.price <= q2.price) return q1;
+  return q2;
+}
