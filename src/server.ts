@@ -4,6 +4,30 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
+import { Queue } from 'bullmq';
+
+const fastify = Fastify({
+  logger: true,
+});
+
+const orderQueue = new Queue('order-queue', {
+  connection: {
+    host: process.env.REDIS_HOST ?? '127.0.0.1',
+    port: +(process.env.REDIS_PORT ?? 6379),
+  },
+});
+
+fastify.post('/orders', async (request, reply) => {
+  const { orderId, payload } = request.body as { orderId?: string; payload?: any };
+  if (!orderId) return reply.status(400).send({ error: 'orderId required' });
+
+  const job = await orderQueue.add('process-order', { orderId, payload }, {
+    removeOnComplete: true,
+  });
+
+  return reply.send({ ok: true, jobId: job.id });
+});
+
 const PORT = Number(process.env.PORT) || 3000;
 
 async function buildServer() {
