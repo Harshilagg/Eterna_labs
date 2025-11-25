@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      - name: Install dependencies
+        run: npm ci
+      - name: Run unit tests
+        run: |
+          npm run test:unit
+      - name: Build
+        run: npm run build
+  integration-tests:
+    needs: unit-tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: order_engine
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"
+          --health-interval 10s --health-timeout 5s --health-retries 5
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s --health-timeout 5s --health-retries 5
+    env:
+      DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/order_engine
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      - name: Install dependencies
+        run: npm ci
+      - name: Wait for Postgres to be ready
+        run: |
+          node -e "const {Client}=require('pg');const url=process.env.DATABASE_URL;(async()=>{for(let i=0;i<30;i++){try{const c=new Client({connectionString:url});await c.connect();await c.end();console.log('Postgres ready');process.exit(0);}catch(e){console.log('waiting for Postgres',i);await new Promise(r=>setTimeout(r,2000));}}console.error('Postgres not ready');process.exit(1);})();"
+      - name: Run migrations
+        run: npm run migrate
+      - name: Run integration tests
+        run: |
+          RUN_INTEGRATION=1 NODE_ENV=test npm run test:integration

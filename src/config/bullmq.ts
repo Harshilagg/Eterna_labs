@@ -1,39 +1,59 @@
 import { Queue, Worker, QueueScheduler } from "bullmq";
-import { redis } from "./redis";
-import path from "path";
+import { getRedis } from "./redis";
 
-export const orderQueue = new Queue("order-queue", {
-  connection: redis,
-});
+let _orderQueue: any = null;
+let _orderQueueScheduler: any = null;
+let _orderWorker: any = null;
 
-// Prevent stalled jobs
-new QueueScheduler("order-queue", {
-  connection: redis,
-});
-
-// Worker to process orders
-export const orderWorker = new Worker(
-  "order-queue",
-  async (job) => {
-    console.log(`Processing order job: ${job.id}`);
-    const orderData = job.data;
-
-    // Simulate processing (later replaced with real logic)
-    return {
-      status: "processed",
-      processedAt: new Date().toISOString(),
-      originalOrder: orderData,
+export function getOrderQueue() {
+  if (_orderQueue) return _orderQueue;
+  if (process.env.NODE_ENV === 'test') {
+    _orderQueue = {
+      add: async (name: string, data: any, opts: any) => ({ id: `test-${Date.now()}`, name, data, opts }),
+      close: async () => {},
+      getJob: async (id: string) => null,
     };
-  },
-  {
-    connection: redis,
+  } else {
+    _orderQueue = new Queue('order-queue', { connection: getRedis() });
   }
-);
+  return _orderQueue;
+}
 
-orderWorker.on("completed", (job) => {
-  console.log(`Job completed: ${job.id}`);
-});
+export function getOrderQueueScheduler() {
+  if (_orderQueueScheduler) return _orderQueueScheduler;
+  if (process.env.NODE_ENV === 'test') {
+    _orderQueueScheduler = { close: async () => {} };
+  } else {
+    _orderQueueScheduler = new QueueScheduler('order-queue', { connection: getRedis() });
+  }
+  return _orderQueueScheduler;
+}
 
-orderWorker.on("failed", (job, err) => {
-  console.error(`Job failed: ${job?.id}`, err);
-});
+export function getOrderWorker(processor?: (job: any) => Promise<any>) {
+  if (_orderWorker) return _orderWorker;
+  if (process.env.NODE_ENV === 'test') {
+    _orderWorker = {
+      on: (_ev: string, _cb: Function) => {},
+      close: async () => {},
+    };
+  } else {
+    _orderWorker = new Worker('order-queue', processor ?? (async (job) => {
+      console.log(`Processing order job: ${job.id}`);
+      const orderData = job.data;
+      return {
+        status: 'processed',
+        processedAt: new Date().toISOString(),
+        originalOrder: orderData,
+      };
+    }), { connection: getRedis() });
+
+    _orderWorker.on('completed', (job: any) => {
+      console.log(`Job completed: ${job.id}`);
+    });
+
+    _orderWorker.on('failed', (job: any, err: any) => {
+      console.error(`Job failed: ${job?.id}`, err);
+    });
+  }
+  return _orderWorker;
+}

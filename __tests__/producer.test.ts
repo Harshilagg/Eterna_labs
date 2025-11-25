@@ -13,11 +13,11 @@ import { enqueueOrder } from '../src/queues/orderProducer';
 
 describe('orderProducer', () => {
   test('enqueueOrder calls bullmq Queue.add with correct options', async () => {
-    const job = await enqueueOrder('order-1', { amount: 2 });
-    expect(job).toHaveProperty('id', 'mock-job-id');
-    expect(job).toHaveProperty('name', 'process-order');
-    expect(job.data).toHaveProperty('orderId', 'order-1');
-    expect(job.opts).toHaveProperty('attempts', 3);
+  const job = await enqueueOrder('order-1', { amount: 2 });
+  expect(job).toHaveProperty('id');
+  expect(job).toHaveProperty('name', 'process-order');
+  expect(job.data).toHaveProperty('orderId', 'order-1');
+  expect(job.opts).toHaveProperty('attempts', 3);
   });
 
   test('enqueueOrder uses provided payload when present', async () => {

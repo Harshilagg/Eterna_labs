@@ -1,0 +1,65 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Order Engine Demo</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 2rem; }
+    label { display:block; margin-top: .5rem }
+    pre { background:#f5f5f5; padding:1rem; max-height:300px; overflow:auto }
+  </style>
+</head>
+<body>
+  <h1>Order Execution Engine — Demo</h1>
+  <form id="orderForm">
+    <label>Amount: <input id="amount" type="number" value="1" step="0.1" /></label>
+    <label>Symbol: <input id="symbol" type="text" value="TOKEN" /></label>
+    <button type="submit">Submit Market Order</button>
+  </form>
+
+  <h2>Server response</h2>
+  <pre id="response">(none)</pre>
+
+  <h2>WebSocket events</h2>
+  <pre id="events">(no events yet)</pre>
+
+  <script>
+    const form = document.getElementById('orderForm');
+    const resp = document.getElementById('response');
+    const events = document.getElementById('events');
+    let ws;
+
+    function logEvent(x){
+      events.textContent = `${new Date().toISOString()} — ${JSON.stringify(x)}\n` + events.textContent;
+    }
+
+    form.addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      const amount = Number(document.getElementById('amount').value) || 1;
+      const symbol = document.getElementById('symbol').value || 'TOKEN';
+
+      // POST to create order
+      try {
+        const res = await fetch('/api/orders/execute', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'market', amount, symbol })
+        });
+        const body = await res.json();
+        resp.textContent = JSON.stringify(body, null, 2);
+
+        // open WS to receive lifecycle events
+        const wsUrl = `ws://${location.hostname}:${location.port}/ws`;
+        if (ws) ws.close();
+        ws = new WebSocket(wsUrl);
+        ws.addEventListener('open', () => logEvent({ event: 'connected' }));
+        ws.addEventListener('message', (m) => {
+          try { logEvent(JSON.parse(m.data)); } catch(e){ logEvent(m.data); }
+        });
+      } catch (e) {
+        resp.textContent = String(e);
+      }
+    });
+  </script>
+</body>
+</html>

@@ -7,7 +7,7 @@ const TEST_MODE = process.env.NODE_ENV === 'test';
 export async function getRaydiumQuote(amount: number): Promise<DexQuote> {
   if (TEST_MODE) {
     // deterministic fast response for tests
-    return { dex: 'raydium', price: 101, liquidity: 120000 };
+    return { dex: 'raydium', price: 102, liquidity: 120000 };
   }
 
   // simulate network delay

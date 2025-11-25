@@ -7,7 +7,7 @@ const TEST_MODE = process.env.NODE_ENV === 'test';
 async function getRaydiumQuote(amount) {
     if (TEST_MODE) {
         // deterministic fast response for tests
-        return { dex: 'raydium', price: 101, liquidity: 120000 };
+        return { dex: 'raydium', price: 102, liquidity: 120000 };
     }
     // simulate network delay
     await new Promise((r) => setTimeout(r, 2000 + Math.random() * 1000));

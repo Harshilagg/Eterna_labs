@@ -1,5 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.startWorker = startWorker;
 // src/workers/orderWorker.ts
 require("dotenv/config");
 const bullmq_1 = require("bullmq");
@@ -7,14 +8,9 @@ const orderQueue_1 = require("../queues/orderQueue");
 const mockDex_1 = require("../dex/mockDex");
 const uuid_1 = require("uuid");
 const db_1 = require("../config/db");
-const connection = {
-    host: process.env.REDIS_HOST ?? '127.0.0.1',
-    port: +(process.env.REDIS_PORT ?? 6379),
-};
-console.log('[worker] started — connecting to Redis at', connection);
-// ensure scheduler is referenced
-const scheduler = orderQueue_1.orderQueueScheduler;
-const worker = new bullmq_1.Worker('order-queue', async (job) => {
+let _worker = null;
+// processor function implementing the lifecycle for a job
+async function processor(job) {
     console.log(`[worker] processing job ${job.id} name=${job.name}`);
     const { orderId, payload } = job.data;
     try {
@@ -51,19 +47,41 @@ const worker = new bullmq_1.Worker('order-queue', async (job) => {
         await (0, db_1.markOrderFailed)(orderId, err?.message ?? String(err));
         throw err;
     }
-}, { connection, concurrency: 10 });
-worker.on('completed', (job) => {
-    console.log(`[worker] job ${job.id} completed`);
-});
-worker.on('failed', (job, err) => {
-    console.error(`[worker] job ${job?.id} failed:`, err);
-});
-// graceful shutdown
-const shutDown = async () => {
-    console.log('[worker] shutting down');
-    await worker.close();
-    await scheduler.close();
-    process.exit(0);
-};
-process.on('SIGINT', shutDown);
-process.on('SIGTERM', shutDown);
+}
+async function startWorker() {
+    if (_worker)
+        return _worker;
+    const connection = {
+        host: process.env.REDIS_HOST ?? '127.0.0.1',
+        port: +(process.env.REDIS_PORT ?? 6379),
+    };
+    console.log('[worker] starting — connecting to Redis at', connection);
+    // ensure scheduler is referenced
+    const scheduler = orderQueue_1.orderQueueScheduler;
+    _worker = new bullmq_1.Worker('order-queue', processor, { connection, concurrency: 10 });
+    _worker.on('completed', (job) => {
+        console.log(`[worker] job ${job.id} completed`);
+    });
+    _worker.on('failed', (job, err) => {
+        console.error(`[worker] job ${job?.id} failed:`, err);
+    });
+    // graceful shutdown
+    const shutDown = async () => {
+        console.log('[worker] shutting down');
+        await _worker.close();
+        await scheduler.close();
+        process.exit(0);
+    };
+    if (process.env.NODE_ENV !== 'test') {
+        process.on('SIGINT', shutDown);
+        process.on('SIGTERM', shutDown);
+    }
+    return _worker;
+}
+// When run directly, start the worker
+if (require.main === module) {
+    startWorker().catch((err) => {
+        console.error('Failed to start worker', err);
+        process.exit(1);
+    });
+}

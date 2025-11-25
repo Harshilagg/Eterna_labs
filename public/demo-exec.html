@@ -1,0 +1,62 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Order Engine Demo - Single Connection</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 2rem; }
+    label { display:block; margin-top: .5rem }
+    pre { background:#f5f5f5; padding:1rem; max-height:300px; overflow:auto }
+  </style>
+</head>
+<body>
+  <h1>Order Execution Engine — Single-connection Demo</h1>
+  <form id="orderForm">
+    <label>Amount: <input id="amount" type="number" value="1" step="0.1" /></label>
+    <label>Symbol: <input id="symbol" type="text" value="TOKEN" /></label>
+    <button type="submit">Open WS & Submit Order</button>
+  </form>
+
+  <h2>Server response</h2>
+  <pre id="response">(none)</pre>
+
+  <h2>WebSocket events</h2>
+  <pre id="events">(no events yet)</pre>
+
+  <script>
+    const form = document.getElementById('orderForm');
+    const resp = document.getElementById('response');
+    const events = document.getElementById('events');
+    let ws;
+
+    function logEvent(x){
+      events.textContent = `${new Date().toISOString()} — ${JSON.stringify(x)}\n` + events.textContent;
+    }
+
+    form.addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      const amount = Number(document.getElementById('amount').value) || 1;
+      const symbol = document.getElementById('symbol').value || 'TOKEN';
+
+      // open WS exec connection
+      const wsUrl = `ws://${location.hostname}:${location.port}/ws-exec`;
+      if (ws) ws.close();
+      ws = new WebSocket(wsUrl);
+
+      ws.addEventListener('open', () => {
+        logEvent({ event: 'connected' });
+        // send initial payload as first message
+        const payload = { type: 'market', payload: { amount, symbol } };
+        ws.send(JSON.stringify(payload));
+      });
+
+      ws.addEventListener('message', (m) => {
+        try { logEvent(JSON.parse(m.data)); } catch(e){ logEvent(m.data); }
+      });
+
+      ws.addEventListener('close', () => logEvent({ event: 'closed' }));
+      ws.addEventListener('error', (e) => logEvent({ event: 'error', e }));
+    });
+  </script>
+</body>
+</html>

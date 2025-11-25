@@ -49,12 +49,68 @@ Environment variables
 - `REDIS_HOST` - redis host (default 127.0.0.1)
 - `REDIS_PORT` - redis port (default 6379)
 
-Notes
-- This repo already contains a simple `orderWorker` and producer helper. I fixed the server to track WS clients and start the Fastify server.
-- Next steps I can take on request: add tests, consolidate Redis connection modules, or wire a Postgres persistence layer (there is a `pg` dependency already present).
 
-Design choices for the assignment
-- Chosen order type: Market Order. Reason: Market orders emphasize routing and immediate execution flow which is the core of the assignment (compare DEX quotes, pick best venue, execute). Implementing Market order allows clear demonstration of routing, retries, queue management and real-time lifecycle events. Limit and Sniper orders can be added by adding price-watchers and event triggers on top of the same routing/worker architecture.
+Docker / local dev
+- A `docker-compose.yml` has been added to bring up Redis and Postgres for local development:
+
+  docker-compose up -d
+
+  This will start:
+  - Redis on port 6379
+  - Postgres on port 5432 (DB: order_engine, user: postgres, password: postgres)
+
+Postman collection
+- `postman_collection.json` contains sample requests for `/api/orders/execute`, `/jobs/:id` and the WebSocket endpoint.
+
+Quick local run (if you have Docker):
+
+1. Start docker services
+
+```bash
+docker-compose up -d
+```
+
+2. Install dependencies
+
+```bash
+npm install
+```
+
+3. Start server
+
+```bash
+PORT=3001 npm run dev
+```
+
+4. Start worker (separate terminal)
+
+```bash
+npm run worker
+```
+
+5. Use Postman collection or curl to create orders and connect a WebSocket client to view lifecycle updates.
+
+
+-
+### Running tests
+
+Unit tests are fast and run without Redis by default. Use:
+
+```bash
+npm run test:unit
+```
+
+To run integration tests (these require Redis), start Redis first, then:
+
+```bash
+npm run test:integration
+```
+
+To create the Postgres schema (migrations), set DATABASE_URL and run:
+
+```bash
+npm run migrate
+```
 
 How to use the assignment endpoint
 - POST /api/orders/execute accepts a JSON body with optional fields `type` (defaults to `market`), `amount`, and `symbol`.

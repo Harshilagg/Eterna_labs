@@ -1,12 +1,42 @@
-import { buildServer } from '../src/server';
+// Mock bullmq to avoid real Redis connections during tests (prevents open handles)
+jest.mock('bullmq', () => {
+  class DummyQueue {
+    constructor() {}
+    async add(name: string, data: any, opts: any) {
+      return { id: 'mock-job-id', name, data, opts };
+    }
+    async getJob(id: string) {
+      return null;
+    }
+    async close() {}
+  }
+
+  class DummyQueueEvents {
+    constructor() {}
+    on() {}
+    close() {}
+  }
+
+  return {
+    Queue: DummyQueue,
+    QueueEvents: DummyQueueEvents,
+    QueueScheduler: class {
+      constructor() {}
+      async close() {}
+    },
+  };
+});
 
 jest.mock('../src/queues/orderProducer', () => ({
   enqueueOrder: jest.fn(async (orderId: string, payload: any) => ({ id: `job-${orderId}` })),
 }));
 
+import { buildServer } from '../src/server';
+
 describe('server /api/orders/execute', () => {
   let fastify: any;
   beforeAll(async () => {
+    process.env.NODE_ENV = 'test';
     fastify = await buildServer(0); // ephemeral port
   });
   afterAll(async () => {

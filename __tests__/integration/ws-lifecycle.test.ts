@@ -1,13 +1,17 @@
-import { buildServer } from '../../src/server';
-import WebSocket from 'ws';
-import { enqueueOrder } from '../../src/queues/orderProducer';
-import { orderQueue } from '../../src/queues/orderQueue';
+// Integration tests require a running Redis instance. Skip by default to avoid
+// opening real Redis connections during the unit test run. To run these,
+// set RUN_INTEGRATION=1 in the environment.
+const runIntegration = process.env.RUN_INTEGRATION === '1';
 
-describe('websocket lifecycle integration (requires Redis)', () => {
+(runIntegration ? describe : describe.skip)('websocket lifecycle integration (requires Redis)', () => {
   jest.setTimeout(30000);
   let server: any;
 
   beforeAll(async () => {
+    // Delay imports so that when integration tests are skipped we don't import modules
+    // that create real Redis/BullMQ connections at module import time.
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { buildServer } = require('../../src/server');
     server = await buildServer(4001);
   });
 
@@ -17,6 +21,12 @@ describe('websocket lifecycle integration (requires Redis)', () => {
 
   test('enqueue order and receive progress via ws', (done) => {
     // connect ws client
+    // lazy require heavy modules
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const WebSocket = require('ws');
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { enqueueOrder } = require('../../src/queues/orderProducer');
+
     const ws = new WebSocket('ws://localhost:4001/ws');
     ws.on('open', async () => {
       // enqueue a job via producer helper
@@ -24,7 +34,7 @@ describe('websocket lifecycle integration (requires Redis)', () => {
       let seenRouting = false;
       let seenConfirmed = false;
 
-      ws.on('message', (m) => {
+  ws.on('message', (m: any) => {
         try {
           const parsed = JSON.parse(m.toString());
           if (parsed.event === 'job:progress') {
